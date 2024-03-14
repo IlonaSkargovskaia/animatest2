@@ -2,6 +2,7 @@
   width: 600px;
   margin: 0 auto;
   position: relative;
+  
 }
 
 .slider-container {
@@ -38,7 +39,7 @@
 }
 
 .next-item {
-  width: 100px; 
+  width: 115px; 
 }
 
 .next-item img {

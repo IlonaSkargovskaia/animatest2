@@ -7,16 +7,19 @@ function App() {
     const [dataItems, setDataItems] = useState([]);
     const [sliderPosition, setSliderPosition] = useState(0);
     const [nextItems, setNextItems] = useState([]);
-
+    
     const dataSource = new DataSourceEndpoint();
 
     useEffect(() => {
-        const initialDataItems = dataSource.getNextDataItems(10);
-        setDataItems(initialDataItems);
-        setCurrentIndex(0);
-//next images
-        const nextItemsSlice = initialDataItems.slice(1, 6);
-        setNextItems(nextItemsSlice);
+        async function fetchData() {
+            const initialDataItems = await dataSource.getNextDataItems(10);
+            setDataItems(initialDataItems);
+            setCurrentIndex(0);
+
+            const nextItems = initialDataItems.slice(1, 6);
+            setNextItems(nextItems);
+        }
+        fetchData();
     }, []);
 
     useEffect(() => {
@@ -24,33 +27,53 @@ function App() {
         setSliderPosition(newPosition);
     }, [currentIndex]);
 
-    const handlePrevious = () => {
+    const handlePrevious = async () => {
         if (currentIndex > 0) {
             const prevIndex = currentIndex - 1;
-            const prevItemsSlice = dataItems.slice(
-                prevIndex + 1,
-                prevIndex + 6
-            );
+            const prevItemsSlice = dataItems.slice(prevIndex + 1, prevIndex + 6);
+    
+            if (prevItemsSlice.length < 5) {
+                const cachedItems = await dataSource.retrieveFromIndexedDB();
+                if (cachedItems.length > 0) {
+                    const startIndex = cachedItems.length - (5 - prevItemsSlice.length);
+                    const additionalCachedItems = cachedItems.slice(startIndex, cachedItems.length);
+                    const newItems = [...additionalCachedItems, ...prevItemsSlice];
+                    const excessItems = newItems.slice(0, newItems.length - 10); 
+                    await dataSource.saveToIndexedDB(excessItems); 
+                    setDataItems(newItems.slice(excessItems.length)); 
+                    setCurrentIndex(prevIndex);
+                    return;
+                }
+            }
+    
             setNextItems(prevItemsSlice);
             setCurrentIndex(prevIndex);
         }
     };
+    
+    
 
-    const handleNext = () => {
+    const handleNext = async () => {
         const nextIndex = currentIndex + 1;
 
         if (nextIndex >= dataItems.length - 6) {
-            const newItems = dataSource.getNextDataItems(5);
+            const newItems = await dataSource.getNextDataItems(5);
             setDataItems((prevItems) => [...prevItems, ...newItems]);
         }
 
-        const nextItemsSlice = dataItems.slice(nextIndex + 1, nextIndex + 6);
-        setNextItems(nextItemsSlice);
+        let updatedNextItems = dataItems.slice(nextIndex + 1, nextIndex + 6);
+        if (updatedNextItems.length < 5) {
+            const additionalItems = await dataSource.getNextDataItems(
+                5 - updatedNextItems.length
+            );
+            updatedNextItems = [...updatedNextItems, ...additionalItems];
+        }
+        setNextItems(updatedNextItems);
 
         setCurrentIndex(nextIndex);
-    };
 
-    console.log("Data =>", dataItems);
+        console.log("Data =>", dataItems);
+    };
 
     return (
         <div className="slider-wrapper">
